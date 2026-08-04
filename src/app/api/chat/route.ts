@@ -1,2 +1,17 @@
-import type { NextRequest } from "next/server";
-export async function POST(req:NextRequest){try{const{ messages,model,apiKey }=await req.json();const key=apiKey||process.env.OPENROUTER_API_KEY||"";if(!key)return Response.json({response:"Aucune cle API. Ajoutez votre cle OpenRouter dans BYOK."});const body:any={model:model||"google/gemini-2.0-flash-001",messages,stream:true,max_tokens:4096};const isV=(model||"").includes("gemini")||(model||"").includes("gpt-4o")||(model||"").includes("claude")||(model||"").includes("vision")||(model||"").includes("pixtral");if(!isV)body.messages=body.messages.map((m:any)=>Array.isArray(m.content)?{...m,content:m.content.filter((c:any)=>c.type==="text").map((c:any)=>c.text).join("\n")}:m);const r=await fetch("https://openrouter.ai/api/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+key,"HTTP-Referer":"https://elshalflow-ai.vercel.app","X-Title":"ElshalflowAI"},body:JSON.stringify(body)});if(!r.ok){const e=await r.text();let m="Erreur "+r.status;try{m=JSON.parse(e).error?.message||m}catch{}return Response.json({response:m},{status:500})}return new Response(r.body,{headers:{"Content-Type":"text/event-stream","Cache-Control":"no-cache",Connection:"keep-alive"}})}catch(e:any){return Response.json({response:"Erreur: "+e.message},{status:500})}}
+import { NextRequest, NextResponse } from "next/server";
+
+export async function POST(req: NextRequest) {
+  try {
+    const { messages, model, apiKey } = await req.json();
+    const key = apiKey || process.env.OPENROUTER_API_KEY || "";
+    if (!key) {
+      return NextResponse.json({ response: "Aucune cle API. Ajoutez votre cle OpenRouter dans Cles API." });
+    }
+    const body: Record<string, any> = { model: model || "google/gemini-2.0-flash-001", messages, stream: true, max_tokens: 4096 };
+    const isV = (model || "").includes("gemini") || (model || "").includes("gpt-4o") || (model || "").includes("claude") || (model || "").includes("vision") || (model || "").includes("pixtral");
+    if (!isV) body.messages = body.messages.map((m: any) => Array.isArray(m.content) ? { ...m, content: m.content.filter((c: any) => c.type === "text").map((c: any) => c.text).join("\n") } : m);
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + key, "HTTP-Referer": "https://elshalflow-ai.vercel.app", "X-Title": "ElshalflowAI" }, body: JSON.stringify(body) });
+    if (!response.ok) { const e = await response.text(); let m = "Erreur " + response.status; try { m = JSON.parse(e).error?.message || m; } catch {} return NextResponse.json({ response: m }, { status: 500 }); }
+    return new Response(response.body, { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" } });
+  } catch (e: any) { return NextResponse.json({ response: "Erreur: " + (e.message || "?") }, { status: 500 }); }
+}
