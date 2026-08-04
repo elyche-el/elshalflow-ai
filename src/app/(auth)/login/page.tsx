@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Brain, Mail, Key, GithubIcon, Globe } from "lucide-react";
+import { Brain, Mail, Key, Github, Globe } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import Link from "next/link";
 
@@ -92,7 +92,7 @@ export default function LoginPage() {
                 disabled={loading}
                 className="w-full"
               >
-                <GithubIcon className="mr-2 h-4 w-4" />
+                <Github className="mr-2 h-4 w-4" />
                 GitHub
               </Button>
             </div>
