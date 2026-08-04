@@ -1,109 +1,30 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import Link from "next/link";
+import { Brain, Key, Puzzle, Shield, ArrowRight, Sparkles } from "lucide-react";
 
 export default function HomePage() {
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({ users: 0, conversations: 0, agents: 0 });
-
-  useEffect(() => {
-    async function fetchStats() {
-      try {
-        const { count: users } = await supabase
-          .from("profiles")
-          .select("*", { count: "exact", head: true });
-        const { count: conversations } = await supabase
-          .from("conversations")
-          .select("*", { count: "exact", head: true });
-        setStats({ users: users || 0, conversations: conversations || 0, agents: 0 });
-      } catch (err) {
-        console.error("Failed to fetch stats:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchStats();
-  }, []);
-
   return (
-    <main className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center p-4">
-      <div className="max-w-2xl w-full space-y-12 text-center">
-        {/* Logo & Title */}
-        <div className="space-y-4">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-primary/10 border border-primary/20">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" className="w-10 h-10 text-primary">
-              <rect x="4" y="4" width="32" height="32" rx="8" fill="currentColor" opacity="0.15" />
-              <circle cx="20" cy="18" r="8" fill="currentColor" />
-              <path d="M12 28 Q20 36 28 28" fill="none" stroke="currentColor" strokeWidth="2" />
-            </svg>
-          </div>
-          <div className="space-y-2">
-            <h1 className="text-5xl font-bold tracking-tight">
-              Elshalflow<span className="text-primary">AI</span>
-            </h1>
-            <p className="text-muted-foreground text-lg max-w-md mx-auto">
-              Build and run AI agents with your own keys, MCP servers, and Composio integrations.
-            </p>
+    <div className="min-h-screen bg-background">
+      <header className="border-b border-border">
+        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2"><Brain className="h-7 w-7 text-primary" /><span className="font-bold text-lg">ElshalflowAI</span></div>
+          <div className="flex items-center gap-3"><Link href="/login" className="text-sm text-muted-foreground hover:text-foreground">Connexion</Link><Link href="/register" className="text-sm bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90">Essai gratuit</Link></div>
+        </div>
+      </header>
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent" />
+        <div className="relative max-w-6xl mx-auto px-4 py-24 md:py-32 text-center">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-primary/20 bg-primary/5 text-primary text-sm mb-8"><Sparkles className="h-4 w-4" />Plateforme d&apos;Agents IA</div>
+          <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6">Vos agents IA,<br /><span className="text-primary">vos clés, vos apps</span></h1>
+          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10">BYOK, Composio et MCP — plateforme d&apos;agents IA personnalisable.</p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link href="/register" className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-8 py-3 rounded-xl text-lg font-medium hover:bg-primary/90 shadow-lg shadow-primary/25">Commencer gratuitement<ArrowRight className="h-5 w-5" /></Link>
+            <Link href="https://github.com/elyche-el/elshalflow-ai" target="_blank" className="inline-flex items-center gap-2 border border-border px-8 py-3 rounded-xl text-lg font-medium hover:bg-secondary">Voir sur GitHub</Link>
           </div>
         </div>
-
-        {/* CTA */}
-        <div className="flex gap-3 justify-center">
-          <a
-            href="/chat"
-            className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-xl font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
-          >
-            Start Chatting
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
-            </svg>
-          </a>
-          <a
-            href="/settings"
-            className="inline-flex items-center gap-2 border border-border px-6 py-3 rounded-xl font-medium hover:bg-secondary transition-colors"
-          >
-            Settings
-          </a>
-        </div>
-
-        {/* Stats */}
-        {loading ? (
-          <div className="flex gap-8 justify-center animate-pulse">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="space-y-2">
-                <div className="h-8 w-12 bg-secondary rounded mx-auto" />
-                <div className="h-4 w-16 bg-secondary rounded" />
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-3 gap-4">
-            <div className="p-4 rounded-xl bg-card border border-border">
-              <div className="text-2xl font-bold text-primary">{stats.users}</div>
-              <div className="text-sm text-muted-foreground">Users</div>
-            </div>
-            <div className="p-4 rounded-xl bg-card border border-border">
-              <div className="text-2xl font-bold">{stats.conversations}</div>
-              <div className="text-sm text-muted-foreground">Conversations</div>
-            </div>
-            <div className="p-4 rounded-xl bg-card border border-border">
-              <div className="text-2xl font-bold">{stats.agents}</div>
-              <div className="text-sm text-muted-foreground">Agents</div>
-            </div>
-          </div>
-        )}
-
-        {/* Footer */}
-        <p className="text-sm text-muted-foreground">
-          Powered by Next.js • Supabase • Composio • Vercel
-        </p>
-      </div>
-    </main>
+      </section>
+      <section className="max-w-6xl mx-auto px-4 py-20"><div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">{[{icon:<Brain className="h-6 w-6"/>,t:"Chat IA",d:"Streaming, historique, multi-modèles."},{icon:<Key className="h-6 w-6"/>,t:"BYOK",d:"Vos propres clés API, chiffrées."},{icon:<Puzzle className="h-6 w-6"/>,t:"Composio",d:"250+ apps: Gmail, Slack, GitHub."},{icon:<Shield className="h-6 w-6"/>,t:"MCP",d:"Contexte illimité via MCP."}].map((f,i)=>(<div key={i} className="p-6 rounded-2xl border border-border bg-card hover:border-primary/30 transition-all"><div className="p-3 rounded-xl bg-primary/10 w-fit mb-4"><div className="text-primary">{f.icon}</div></div><h3 className="font-semibold mb-2">{f.t}</h3><p className="text-sm text-muted-foreground">{f.d}</p></div>))}</div></section>
+      <section className="border-t border-border py-16"><div className="max-w-6xl mx-auto px-4 text-center"><p className="text-sm text-muted-foreground mb-6">Construit avec</p><div className="flex flex-wrap justify-center gap-8 text-sm text-muted-foreground font-mono"><span>Next.js 16</span><span>TypeScript</span><span>Supabase</span><span>Composio</span><span>Tailwind v4</span><span>Vercel</span></div></div></section>
+      <footer className="border-t border-border py-8"><div className="text-center text-sm text-muted-foreground">© 2026 ElshalflowAI</div></footer>
+    </div>
   );
 }
