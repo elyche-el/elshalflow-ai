@@ -1,27 +1,13 @@
-import { auth } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
 import type { NextRequest } from "next/server";
-
+const DEMO_KEY = process.env.OPENROUTER_API_KEY || "";
 export async function POST(req: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) return Response.json({ error: "Unauthorized" }, { status: 401 });
     const body = await req.json();
-    const { messages, conversationId } = body;
-    if (conversationId && messages?.length > 0) {
-      const lastMsg = messages[messages.length - 1];
-      if (lastMsg.role === "user") {
-        const supabase = await createClient();
-        await supabase.from("messages").insert({ conversation_id: conversationId, role: "user", content: lastMsg.content });
-      }
-    }
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.OPENROUTER_API_KEY || "demo"}` },
-      body: JSON.stringify({ model: "openai/gpt-4o-mini", messages, stream: true }),
-    });
-    return new Response(response.body, { headers: { "Content-Type": "text/event-stream" } });
-  } catch (error: any) {
-    return Response.json({ error: error.message || "Stream failed" }, { status: 500 });
-  }
+    const { messages, model } = body;
+    const requestBody: any = { model: model || "openai/gpt-4o-mini", messages: messages || [], stream: true };
+    const isVision = (model || "").includes("vision") || (model || "").includes("gpt-4o") || (model || "").includes("claude-3") || (model || "").includes("gemini");
+    if (!isVision) requestBody.messages = requestBody.messages.map((m: any) => Array.isArray(m.content) ? { ...m, content: m.content.filter((c: any) => c.type === "text").map((c: any) => c.text).join("\n") } : m);
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${DEMO_KEY}`, "HTTP-Referer": "https://elshalflow-ai.vercel.app", "X-Title": "ElshalflowAI" }, body: JSON.stringify(requestBody) });
+    return new Response(response.body, { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" } });
+  } catch (error: any) { return Response.json({ error: error.message }, { status: 500 }); }
 }
