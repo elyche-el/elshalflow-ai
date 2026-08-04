@@ -1,4 +1,3 @@
-// ElshalflowAI - Chat API Route
 import { auth } from "@/lib/auth";
 import { streamChatResponse, AVAILABLE_MODELS } from "@/lib/llm/client";
 import { createClient } from "@/lib/supabase/server";
@@ -18,8 +17,7 @@ export async function POST(req: NextRequest) {
         await supabase.from("messages").insert({ conversation_id: conversationId, role: "user", content: lastMsg.content });
       }
     }
-    const result = await streamChatResponse({ userId: session.user.id, modelId: model || AVAILABLE_MODELS[0].id, messages });
-    return result.toTextStreamResponse();
+    return streamChatResponse({ userId: session.user.id, modelId: model || AVAILABLE_MODELS[0].id, messages });
   } catch (error: any) {
     return Response.json({ error: error.message || "Stream failed" }, { status: 500 });
   }

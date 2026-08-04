@@ -1,20 +1,15 @@
-import { createOpenAI } from "@ai-sdk/openai";
-import { streamText } from "ai";
+import { OpenAIStream, StreamingTextResponse } from "ai";
+import OpenAI from "openai";
 
 export const AVAILABLE_MODELS = [
   { id: "gpt-4o-mini", name: "GPT-4o Mini" },
   { id: "gpt-4o", name: "GPT-4o" },
-  { id: "claude-3.5-sonnet", name: "Claude 3.5 Sonnet" },
-  { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro" },
 ];
 
-export async function streamChatResponse(params: {
-  userId: string;
-  modelId: string;
-  messages: any[];
-  systemPrompt?: string;
-}) {
-  const { modelId, messages, systemPrompt } = params;
-  const openai = createOpenAI({ apiKey: "demo", baseURL: "https://openrouter.ai/api/v1" });
-  return streamText({ model: openai(modelId), messages, system: systemPrompt });
+export async function streamChatResponse(params: { userId: string; modelId: string; messages: any[] }) {
+  const { modelId, messages } = params;
+  const openai = new OpenAI({ apiKey: process.env.OPENROUTER_API_KEY || "demo", baseURL: "https://openrouter.ai/api/v1" });
+  const response = await openai.chat.completions.create({ model: modelId, messages, stream: true });
+  const stream = OpenAIStream(response);
+  return new StreamingTextResponse(stream);
 }
