@@ -1,2 +1,1 @@
-import { ChatInterface } from "@/components/chat/chat-interface";
-export default function ChatPage() { return <ChatInterface />; }
+"use client";import { ChatInterface } from "@/components/chat/chat-interface";import { useState, useEffect } from "react";export default function ChatPage() { const [convId, setConvId] = useState(""); useEffect(() => { const p = new URLSearchParams(window.location.search); setConvId(p.get("c") || ""); }, []); return <ChatInterface convId={convId} />; }

@@ -1,42 +1,30 @@
 "use client";
-import { useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Brain, MessageSquare, Key, Puzzle, Shield, Settings, Plus, Menu, X } from "lucide-react";
-
-const NAV = [
-  { href: "/chat", label: "Chat", icon: MessageSquare },
-  { href: "/byok", label: "Cles API", icon: Key },
-  { href: "/composio", label: "Composio", icon: Puzzle },
-  { href: "/mcp", label: "MCP", icon: Shield },
-  { href: "/settings", label: "Parametres", icon: Settings },
-];
-
-export function Sidebar() {
-  const pn = usePathname();
-  const r = useRouter();
-  const [c, setC] = useState(true);
-  function go(h: string) { r.push(h); }
-
+import { useState, useEffect } from "react";
+import { Plus, MessageSquare, Trash2, Key, Settings, Menu, X, Brain } from "lucide-react";
+import { getAnonUserId } from "@/lib/auth-anon";
+type Conv = { id: string; title: string; model: string | null; updated_at: string; created_at: string };
+export function Sidebar({ activeConvId, onSelect, onNew, onDelete }: { activeConvId: string; onSelect: (id: string) => void; onNew: () => void; onDelete: (id: string) => void }) {
+  const [convs, setConvs] = useState<Conv[]>([]); const [open, setOpen] = useState(false); const [page, setPage] = useState<"chat"|"keys"|"settings">("chat");
+  const anonId = typeof window !== "undefined" ? getAnonUserId() : "";
+  useEffect(() => { if (!anonId) return; fetch("/api/conversations", { headers: { "x-anon-user-id": anonId } }).then(r => r.json()).then(d => { if (d.conversations) setConvs(d.conversations); }).catch(() => {}); }, [anonId]);
+  function refresh() { fetch("/api/conversations", { headers: { "x-anon-user-id": anonId } }).then(r => r.json()).then(d => { if (d.conversations) setConvs(d.conversations); }).catch(() => {}); }
+  useEffect(() => { const h = () => refresh(); window.addEventListener("elshalflow_refresh_convs", h); return () => window.removeEventListener("elshalflow_refresh_convs", h); }, []);
+  function handleDelete(id: string) { fetch("/api/conversations", { method: "DELETE", headers: { "Content-Type": "application/json", "x-anon-user-id": anonId }, body: JSON.stringify({ conversationId: id }) }).then(() => { setConvs(p => p.filter(c => c.id !== id)); if (activeConvId === id) onNew(); onDelete(id); }); }
+  const navItems = [{ id: "chat", icon: MessageSquare, label: "Chat" }, { id: "keys", icon: Key, label: "Cles API" }, { id: "settings", icon: Settings, label: "Parametres" }];
   return (<>
-    <button onClick={() => setC(!c)} className="fixed top-3 left-3 z-50 p-2 rounded-lg bg-card border border-border md:hidden">{c ? <Menu className="h-4 w-4" /> : <X className="h-4 w-4" />}</button>
-    {!c && <div className="fixed inset-0 bg-black/50 z-30 md:hidden" onClick={() => setC(true)} />}
-    <aside className={cn("h-full bg-card border-r border-border flex flex-col transition-all duration-200 z-40", c ? "-translate-x-full md:translate-x-0 md:w-[56px]" : "translate-x-0 w-[250px]", "fixed md:relative left-0 top-0 bottom-0")}>
-      <div className="h-11 flex items-center justify-between px-2.5 border-b border-border">
-        {!c && <div className="flex items-center gap-2"><div className="p-1 rounded-md bg-primary/10"><Brain className="h-3.5 w-3.5 text-primary" /></div><span className="font-semibold text-xs">ElshalflowAI</span></div>}
-        <Button variant="ghost" size="icon" className="h-7 w-7 hidden md:flex" onClick={() => setC(!c)}>{c ? <Menu className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}</Button>
-        {!c && <Button variant="ghost" size="icon" className="h-7 w-7 md:hidden" onClick={() => setC(true)}><X className="h-3.5 w-3.5" /></Button>}
-      </div>
-      {!c && <div className="p-1.5"><Button size="sm" className="w-full justify-start gap-2 text-xs h-7" onClick={() => go("/chat")}><Plus className="h-3 w-3" />Nouveau chat</Button></div>}
-      <nav className={cn("px-1 space-y-0.5", c && "md:px-0.5")}>{NAV.map((item) => {
-        const a = pn.startsWith(item.href);
-        const btn = <Button key={item.href} variant={a ? "secondary" : "ghost"} size="sm" className={cn("w-full h-8", c ? "md:justify-center md:px-0" : "justify-start gap-2")} onClick={() => go(item.href)}><item.icon className="h-3.5 w-3.5 shrink-0" />{!c && <span className="text-[11px]">{item.label}</span>}</Button>;
-        return c ? <Tooltip key={item.href}><TooltipTrigger asChild>{btn}</TooltipTrigger><TooltipContent side="right" className="md:block hidden">{item.label}</TooltipContent></Tooltip> : btn;
-      })}</nav>
-      <div className="flex-1" />
-      <div className="border-t border-border p-1.5"><p className="text-[9px] text-muted-foreground text-center">v1.0</p></div>
-    </aside>
-  </>);
+    <button onClick={() => setOpen(!open)} className="fixed top-3 left-3 z-50 p-2 rounded-lg bg-card border border-border md:hidden">{open ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}</button>
+    {open && <div className="fixed inset-0 bg-black/50 z-30 md:hidden" onClick={() => setOpen(false)} />}
+    <aside className={`h-full bg-card border-r border-border flex flex-col transition-all duration-200 z-40 ${open ? "translate-x-0 w-[260px]" : "-translate-x-full"} md:translate-x-0 md:w-[260px] fixed md:relative left-0 top-0 bottom-0`}>
+      <div className="h-12 flex items-center justify-between px-3 border-b border-border shrink-0"><div className="flex items-center gap-2"><Brain className="h-4 w-4 text-primary" /><span className="text-sm font-semibold">ElshalflowAI</span></div><button onClick={() => setOpen(false)} className="md:hidden p-1 hover:bg-secondary rounded"><X className="h-3.5 w-3.5" /></button></div>
+      <nav className="px-2 py-2 flex gap-1 border-b border-border shrink-0">{navItems.map(item => (<button key={item.id} onClick={() => { setPage(item.id as any); if (item.id === "chat") setOpen(false); }} className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-[11px] font-medium transition-colors ${page === item.id ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground"}`}><item.icon className="h-3.5 w-3.5" />{item.label}</button>))}</nav>
+      <div className="flex-1 overflow-y-auto">{page === "chat" && (<div className="p-2 space-y-1"><button onClick={onNew} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-border hover:border-primary/30 hover:bg-secondary/50 transition-all text-[13px] text-left"><Plus className="h-3.5 w-3.5 text-primary" />Nouveau chat</button><div className="mt-3 space-y-0.5"><p className="text-[10px] text-muted-foreground uppercase px-2 mb-1">Recents</p>{convs.length === 0 && <p className="text-[11px] text-muted-foreground px-2 py-2">Aucune conversation</p>}{convs.map(c => (<div key={c.id} className={`group flex items-center gap-1.5 px-2 py-1.5 rounded-md cursor-pointer transition-colors ${c.id === activeConvId ? "bg-secondary" : "hover:bg-secondary/50"}`}><button onClick={() => { onSelect(c.id); setOpen(false); }} className="flex-1 text-left min-w-0"><p className="text-[12px] truncate">{c.title || "Nouveau chat"}</p><p className="text-[10px] text-muted-foreground truncate">{new Date(c.updated_at).toLocaleDateString("fr")}</p></button><button onClick={(e) => { e.stopPropagation(); handleDelete(c.id); }} className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/20 rounded transition-all"><Trash2 className="h-3 w-3 text-red-400" /></button></div>))}</div></div>)}{page === "keys" && <KeysPanel anonId={anonId} />}{page === "settings" && <SettingsPanel anonId={anonId} />}</div>
+      <div className="border-t border-border p-2 shrink-0"><p className="text-[9px] text-muted-foreground text-center">v2.0 · No-auth · ID: {anonId ? anonId.slice(0, 8) + "..." : "..."}</p></div>
+    </aside></>);
 }
+function KeysPanel({ anonId }: { anonId: string }) {
+  const [keys, setKeys] = useState<any[]>([]); const [loading, setLoading] = useState(false); const [showAdd, setShowAdd] = useState(false); const [nl, setNl] = useState(""); const [nk, setNk] = useState("");
+  useEffect(() => { if (!anonId) return; fetch("/api/keys", { headers: { "x-anon-user-id": anonId } }).then(r => r.json()).then(d => { if (d.keys) setKeys(d.keys); }).catch(() => {}); }, [anonId]);
+  function addKey() { if (!nk.trim()) return; setLoading(true); fetch("/api/keys", { method: "POST", headers: { "Content-Type": "application/json", "x-anon-user-id": anonId }, body: JSON.stringify({ provider: "openrouter", label: nl || "OpenRouter", key: nk, is_default: keys.length === 0 }) }).then(r => r.json()).then(() => { setNk(""); setNl(""); setShowAdd(false); return fetch("/api/keys", { headers: { "x-anon-user-id": anonId } }); }).then(r => r.json()).then(d => { if (d.keys) setKeys(d.keys); setLoading(false); }); }
+  return (<div className="p-3 space-y-3"><p className="text-xs font-medium">Cles API (BYOK)</p><p className="text-[10px] text-muted-foreground">Chiffrees AES-256, stockees sur Supabase.</p>{keys.map(k => (<div key={k.id} className="p-2 rounded-lg border border-border bg-secondary/20"><div className="flex items-center justify-between"><div><p className="text-[11px] font-medium">{k.label || k.provider}</p><p className="text-[10px] text-muted-foreground">{k.provider} · {k.is_default ? "Defaut" : ""}</p></div><button onClick={() => { fetch("/api/keys", { method: "DELETE", headers: { "Content-Type": "application/json", "x-anon-user-id": anonId }, body: JSON.stringify({ keyId: k.id }) }).then(() => setKeys(p => p.filter(x => x.id !== k.id))); }} className="p-1 text-red-400 hover:bg-red-500/20 rounded"><Trash2 className="h-3 w-3" /></button></div></div>))}{showAdd ? (<div className="space-y-2 p-2 rounded-lg border border-primary/30 bg-primary/5"><input value={nl} onChange={e => setNl(e.target.value)} placeholder="Nom" className="w-full bg-secondary/50 rounded-md px-2 py-1.5 text-[11px] outline-none" /><input value={nk} onChange={e => setNk(e.target.value)} placeholder="sk-or-v1-..." className="w-full bg-secondary/50 rounded-md px-2 py-1.5 text-[11px] outline-none font-mono" autoFocus /><div className="flex gap-1"><button onClick={addKey} disabled={loading} className="flex-1 py-1.5 bg-primary text-primary-foreground rounded-md text-[11px] font-medium">{loading ? "..." : "Ajouter"}</button><button onClick={() => setShowAdd(false)} className="py-1.5 px-3 border border-border rounded-md text-[11px]">Annuler</button></div></div>) : (<button onClick={() => setShowAdd(true)} className="w-full py-2 border border-dashed border-border rounded-lg text-[11px] text-muted-foreground hover:border-primary/30 hover:text-primary">+ Ajouter une cle</button>)}</div>);
+}
+function SettingsPanel({ anonId }: { anonId: string }) { return (<div className="p-3 space-y-3"><p className="text-xs font-medium">Parametres</p><div className="p-2 rounded-lg border border-border bg-secondary/20 space-y-2 text-[11px]"><div><span className="text-muted-foreground">Session ID:</span> <span className="font-mono">{anonId.slice(0, 16)}...</span></div><p className="text-muted-foreground text-[10px]">Identifie vos conversations et cles de maniere anonyme. Stocke dans le navigateur.</p></div></div>); }

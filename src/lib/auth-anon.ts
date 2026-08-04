@@ -1,0 +1,1 @@
+const AK="elshalflow_anon_id";export function getAnonUserId():string{if(typeof window==="undefined")return"";let id=localStorage.getItem(AK);if(!id){id=crypto.randomUUID();localStorage.setItem(AK,id)}return id}export function getAuthHeaders():Record<string,string>{return{"x-anon-user-id":getAnonUserId()}}
