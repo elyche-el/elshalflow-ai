@@ -8,53 +8,43 @@ import { createClient } from "@/lib/supabase/server";
 import type { NextRequest } from "next/server";
 
 export async function POST(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return new Response("Unauthorized", { status: 401 });
-  }
-
-  const { messages, conversationId, model } = await req.json();
-
-  if (!messages || !messages.length) {
-    return new Response("Messages required", { status: 400 });
-  }
-
-  const supabase = createClient();
-
-  // Verify conversation belongs to user
-  const { data: conversation } = await supabase
-    .from("conversations")
-    .select("id")
-    .eq("id", conversationId)
-    .eq("user_id", session.user.id)
-    .single();
-
-  if (!conversation) {
-    return new Response("Conversation not found", { status: 404 });
-  }
-
-  // Store user message
-  await supabase.from("messages").insert({
-    conversation_id: conversationId,
-    role: "user",
-    content: messages[messages.length - 1].content,
-  });
-
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const { messages, conversationId, model } = body;
+
+    if (!messages || !Array.isArray(messages)) {
+      return Response.json({ error: "Messages array required" }, { status: 400 });
+    }
+
+    if (conversationId && messages.length > 0) {
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg.role === "user") {
+        const supabase = await createClient();
+        await supabase.from("messages").insert({
+          conversation_id: conversationId,
+          role: "user",
+          content: lastMsg.content,
+        });
+      }
+    }
+
     const result = await streamChatResponse({
-      model: model || "openai/gpt-4o-mini",
-      messages,
       userId: session.user.id,
-      conversationId,
+      modelId: model || AVAILABLE_MODELS[0].id,
+      messages,
     });
 
-    // Stream the response
-    return result.toDataStreamResponse();
+    return result.toTextStreamResponse();
   } catch (error: any) {
-    console.error("Chat error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    console.error("Chat API error:", error);
+    return Response.json(
+      { error: error.message || "Stream failed" },
+      { status: 500 }
+    );
   }
 }
