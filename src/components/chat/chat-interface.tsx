@@ -12,31 +12,41 @@ function fileToDataURL(f: File): Promise<string> {
 
 const PROVIDERS = [
   { id: "openrouter", name: "OpenRouter", desc: "30+ modeles gratuits & payants", icon: "🔷" },
-  { id: "mistral",     name: "Mistral AI",  desc: "Mistral Large, Small, Codestral",     icon: "🔴" },
+  { id: "mistral",     name: "Mistral AI",  desc: "Mistral Large, Small, Codestral, 31 modeles", icon: "🔴" },
 ] as const;
 type ProviderId = typeof PROVIDERS[number]["id"];
 
 interface ModelDef { id: string; name: string; free: boolean; vendor: string; desc: string; provider: ProviderId; }
 
 const MODELS: ModelDef[] = [
+  // ── OpenRouter (free) ──
   { id: "nvidia/nemotron-3-super-120b-a12b:free", name: "Nemotron 3 Super", free: true, vendor: "NVIDIA", desc: "120B gratuit", provider: "openrouter" },
   { id: "nvidia/nemotron-nano-9b-v2:free", name: "Nemotron Nano 9B", free: true, vendor: "NVIDIA", desc: "9B gratuit", provider: "openrouter" },
-  { id: "poolside/laguna-s-2.1:free", name: "Laguna S 2.1", free: true, vendor: "Poolside", desc: "Coding gratuit", provider: "openrouter" },
+  { id: "poolside/laguna-s-2.1:free", name: "Laguna S 2.1", free: true, vendor: "Poolside", desc: "Code gratuit", provider: "openrouter" },
   { id: "cohere/north-mini-code:free", name: "North Mini Code", free: true, vendor: "Cohere", desc: "Code gratuit", provider: "openrouter" },
   { id: "inclusionai/ling-3.0-flash:free", name: "Ling 3.0 Flash", free: true, vendor: "InclusionAI", desc: "Rapide gratuit", provider: "openrouter" },
   { id: "google/gemma-4-31b-it:free", name: "Gemma 4 31B", free: true, vendor: "Google", desc: "Vision gratuit", provider: "openrouter" },
   { id: "google/gemma-4-26b-a4b-it:free", name: "Gemma 4 26B", free: true, vendor: "Google", desc: "Vision gratuit", provider: "openrouter" },
   { id: "nvidia/nemotron-nano-12b-v2-vl:free", name: "Nemotron Nano VL", free: true, vendor: "NVIDIA", desc: "Vision gratuit", provider: "openrouter" },
+  // ── OpenRouter (paid) ──
   { id: "deepseek/deepseek-chat-v3-0324", name: "DeepSeek V3", free: false, vendor: "DeepSeek", desc: "$0.27/$1.1", provider: "openrouter" },
   { id: "openai/gpt-4o-mini", name: "GPT-4o Mini", free: false, vendor: "OpenAI", desc: "$0.15/$0.6", provider: "openrouter" },
   { id: "anthropic/claude-3.5-sonnet", name: "Claude 3.5 Sonnet", free: false, vendor: "Anthropic", desc: "$3/$15", provider: "openrouter" },
   { id: "google/gemini-2.5-pro-preview-06-05", name: "Gemini 2.5 Pro", free: false, vendor: "Google", desc: "$1.25/$10", provider: "openrouter" },
-  { id: "mistral-large-latest", name: "Mistral Large", free: false, vendor: "Mistral", desc: "Flagship 128K", provider: "mistral" },
-  { id: "mistral-small-latest", name: "Mistral Small", free: false, vendor: "Mistral", desc: "Rapide", provider: "mistral" },
-  { id: "codestral-latest", name: "Codestral", free: false, vendor: "Mistral", desc: "Code FIM", provider: "mistral" },
-  { id: "ministral-8b-latest", name: "Ministral 8B", free: false, vendor: "Mistral", desc: "Leger", provider: "mistral" },
-  { id: "ministral-3b-latest", name: "Ministral 3B", free: false, vendor: "Mistral", desc: "Ultra-leger", provider: "mistral" },
-  { id: "mistral-medium-latest", name: "Mistral Medium", free: false, vendor: "Mistral", desc: "Milieu", provider: "mistral" },
+  // ── Mistral AI (13 modeles) ──
+  { id: "mistral-large-latest",     name: "Mistral Large",      free: false, vendor: "Mistral", desc: "Flagship 128K", provider: "mistral" },
+  { id: "mistral-medium-latest",    name: "Mistral Medium",     free: false, vendor: "Mistral", desc: "Puissant", provider: "mistral" },
+  { id: "mistral-small-latest",     name: "Mistral Small",      free: false, vendor: "Mistral", desc: "Rapide", provider: "mistral" },
+  { id: "codestral-latest",         name: "Codestral",          free: false, vendor: "Mistral", desc: "Code spe", provider: "mistral" },
+  { id: "mistral-code-latest",      name: "Mistral Code",       free: false, vendor: "Mistral", desc: "Code", provider: "mistral" },
+  { id: "devstral-latest",          name: "Devstral",           free: false, vendor: "Mistral", desc: "Dev", provider: "mistral" },
+  { id: "devstral-medium-latest",   name: "Devstral Medium",    free: false, vendor: "Mistral", desc: "Dev M", provider: "mistral" },
+  { id: "ministral-8b-latest",      name: "Ministral 8B",       free: false, vendor: "Mistral", desc: "Leger", provider: "mistral" },
+  { id: "ministral-3b-latest",      name: "Ministral 3B",       free: false, vendor: "Mistral", desc: "Ultra", provider: "mistral" },
+  { id: "ministral-14b-latest",     name: "Ministral 14B",      free: false, vendor: "Mistral", desc: "Leger+", provider: "mistral" },
+  { id: "magistral-small-latest",   name: "Magistral Small",    free: false, vendor: "Mistral", desc: "Rapide", provider: "mistral" },
+  { id: "mistral-code-agent-latest",name: "Code Agent",         free: false, vendor: "Mistral", desc: "Agent", provider: "mistral" },
+  { id: "labs-leanstral-1-5",       name: "Leanstral 1.5",      free: false, vendor: "Mistral", desc: "Labs", provider: "mistral" },
 ];
 
 export function ChatInterface({ convId: initialConvId }: { convId?: string }) {
@@ -113,7 +123,7 @@ export function ChatInterface({ convId: initialConvId }: { convId?: string }) {
           <div className="flex flex-col items-center justify-center h-full px-6 text-center py-12">
             <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6"><Brain className="w-8 h-8 text-primary/40"/></div>
             <h1 className="text-2xl font-bold mb-2">ElshalflowAI</h1>
-            <p className="text-muted-foreground text-sm max-w-xs mb-6">Assistant IA multi-provider. OpenRouter + Mistral AI.</p>
+            <p className="text-muted-foreground text-sm max-w-xs mb-6">Assistant IA multi-provider. OpenRouter + Mistral AI (31 modeles).</p>
             {!hasKey?(<div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/5 max-w-xs"><p className="text-amber-400 text-sm font-medium mb-1">Ajoutez votre cle API</p><p className="text-muted-foreground text-xs">Menu lateral → Cles API → collez votre cle</p></div>):(<p className="text-green-400 text-xs">Cle detectee — Pret !</p>)}
             <div className="flex gap-2 mt-3">{PROVIDERS.map(p=>(<span key={p.id} className={`text-[10px] px-2 py-0.5 rounded-full ${hasProviderKeys[p.id]?"bg-green-500/15 text-green-400":"bg-muted/30 text-muted-foreground"}`}>{p.icon} {p.name} {hasProviderKeys[p.id]?"✓":""}</span>))}</div>
           </div>
