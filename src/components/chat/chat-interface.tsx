@@ -4,27 +4,20 @@ import { Send, StopCircle, Paperclip, X, Brain } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { getAnonUserId } from "@/lib/auth-anon";
 
-function toB64(f: File) {
-  return new Promise<string>((rs, rj) => {
-    const r = new FileReader();
-    r.onload = () => rs(r.result as string);
-    r.onerror = rj;
-    r.readAsDataURL(f);
-  });
-}
+function toB64(f: File) { return new Promise<string>((rs, rj) => { const r = new FileReader(); r.onload = () => rs(r.result as string); r.onerror = rj; r.readAsDataURL(f); }); }
 
 const MODELS = [
   { id: "nvidia/nemotron-3-super-120b-a12b:free", name: "Nemotron 3 Super", f: true, p: "NVIDIA", d: "120B gratuit" },
   { id: "nvidia/nemotron-3-ultra-550b-a55b:free", name: "Nemotron 3 Ultra", f: true, p: "NVIDIA", d: "550B gratuit" },
-  { id: "google/gemma-4-31b-it:free", name: "Gemma 4 31B", f: true, p: "Google", d: "Vision gratuit" },
-  { id: "google/gemma-4-26b-a4b-it:free", name: "Gemma 4 26B", f: true, p: "Google", d: "Vision gratuit" },
+  { id: "nvidia/nemotron-nano-9b-v2:free", name: "Nemotron Nano 9B", f: true, p: "NVIDIA", d: "9B gratuit" },
   { id: "poolside/laguna-s-2.1:free", name: "Laguna S 2.1", f: true, p: "Poolside", d: "Coding gratuit" },
   { id: "cohere/north-mini-code:free", name: "North Mini Code", f: true, p: "Cohere", d: "Code gratuit" },
-  { id: "nvidia/nemotron-3-nano-30b-a3b:free", name: "Nemotron 3 Nano", f: true, p: "NVIDIA", d: "30B gratuit" },
-  { id: "openai/gpt-oss-20b:free", name: "GPT-OSS 20B", f: true, p: "OpenAI", d: "Open source gratuit" },
   { id: "inclusionai/ling-3.0-flash:free", name: "Ling 3.0 Flash", f: true, p: "InclusionAI", d: "Rapide gratuit" },
-  { id: "nvidia/nemotron-nano-12b-v2-vl:free", name: "Nemotron Nano VL", f: true, p: "NVIDIA", d: "Vision gratuit" },
-  { id: "nvidia/nemotron-nano-9b-v2:free", name: "Nemotron Nano 9B", f: true, p: "NVIDIA", d: "9B gratuit" },
+  { id: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free", name: "Nemotron Omni", f: true, p: "NVIDIA", d: "Reasoning gratuit" },
+  { id: "openai/gpt-oss-20b:free", name: "GPT-OSS 20B", f: true, p: "OpenAI", d: "Open source" },
+  { id: "nvidia/nemotron-nano-12b-v2-vl:free", name: "Nemotron VL", f: true, p: "NVIDIA", d: "Vision" },
+  { id: "google/gemma-4-31b-it:free", name: "Gemma 4 31B", f: true, p: "Google", d: "Vision" },
+  { id: "google/gemma-4-26b-a4b-it:free", name: "Gemma 4 26B", f: true, p: "Google", d: "Vision" },
   { id: "deepseek/deepseek-chat-v3-0324", name: "DeepSeek V3", f: false, p: "DeepSeek", d: "$0.27/$1.1" },
   { id: "openai/gpt-4o-mini", name: "GPT-4o Mini", f: false, p: "OpenAI", d: "$0.15/$0.6" },
   { id: "anthropic/claude-3.5-sonnet", name: "Claude 3.5 Sonnet", f: false, p: "Anthropic", d: "$3/$15" },
@@ -48,33 +41,19 @@ export function ChatInterface({ convId: initialConvId }: { convId?: string }) {
   const fr = useRef<HTMLInputElement>(null);
   const ar = useRef<AbortController>(null);
   const dr = useRef<HTMLDivElement>(null);
+  const sc = useRef<number>(0);
   const anonId = typeof window !== "undefined" ? getAnonUserId() : "";
 
   useEffect(() => {
     if (!convId || !anonId) { setMsgs([]); return; }
-    fetch(`/api/messages?conversationId=${convId}`, { headers: { "x-anon-user-id": anonId } })
-      .then(r => r.json())
-      .then(d => { if (d.messages) setMsgs(d.messages.map((m: any) => ({ id: m.id, role: m.role, content: m.content, model: m.model }))); })
-      .catch(() => {});
+    fetch(`/api/messages?conversationId=${convId}`, { headers: { "x-anon-user-id": anonId } }).then(r => r.json()).then(d => { if (d.messages) setMsgs(d.messages.map((m: any) => ({ id: m.id, role: m.role, content: m.content, model: m.model }))); }).catch(() => {});
   }, [convId, anonId]);
 
-  useEffect(() => {
-    if (!anonId) return;
-    fetch("/api/keys", { headers: { "x-anon-user-id": anonId } })
-      .then(r => r.json())
-      .then(d => setHasKey(!!d.keys?.length))
-      .catch(() => setHasKey(false));
-  }, [anonId]);
+  useEffect(() => { if (!anonId) return; fetch("/api/keys", { headers: { "x-anon-user-id": anonId } }).then(r => r.json()).then(d => setHasKey(!!d.keys?.length)).catch(() => setHasKey(false)); }, [anonId]);
 
-  useEffect(() => {
-    if (sr.current) sr.current.scrollTop = sr.current.scrollHeight;
-  }, [msgs]);
+  useEffect(() => { if (sr.current && loading) sr.current.scrollTop = sr.current.scrollHeight; }, [msgs, loading]);
 
-  useEffect(() => {
-    const h = (e: any) => { if (dr.current && !dr.current.contains(e.target)) setShowM(false); };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, []);
+  useEffect(() => { const h = (e: any) => { if (dr.current && !dr.current.contains(e.target)) setShowM(false); }; document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h); }, []);
 
   function sel(id: string) { setModel(id); setShowM(false); setS(""); }
   function rmImg(i: number) { setImages((p: any) => p.filter((_: any, x: number) => x !== i)); }
@@ -92,17 +71,8 @@ export function ChatInterface({ convId: initialConvId }: { convId?: string }) {
 
   function hPaste(e: any) {
     const fs: File[] = [];
-    for (let i = 0; i < e.clipboardData.items.length; i++) {
-      if (e.clipboardData.items[i].type.startsWith("image/")) {
-        const f = e.clipboardData.items[i].getAsFile();
-        if (f) fs.push(f);
-      }
-    }
-    if (fs.length) {
-      const dt = new DataTransfer();
-      fs.forEach((f: File) => dt.items.add(f));
-      hFiles(dt.files);
-    }
+    for (let i = 0; i < e.clipboardData.items.length; i++) { if (e.clipboardData.items[i].type.startsWith("image/")) { const f = e.clipboardData.items[i].getAsFile(); if (f) fs.push(f); } }
+    if (fs.length) { const dt = new DataTransfer(); fs.forEach((f: File) => dt.items.add(f)); hFiles(dt.files); }
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -111,13 +81,7 @@ export function ChatInterface({ convId: initialConvId }: { convId?: string }) {
     if (!hasKey) { toast.error("Ajoutez une cle OpenRouter dans Cles API"); return; }
 
     let cid = convId;
-    if (!cid) {
-      try {
-        const r = await fetch("/api/conversations", { method: "POST", headers: { "Content-Type": "application/json", "x-anon-user-id": anonId }, body: JSON.stringify({ title: "Nouveau chat", model }) });
-        const d = await r.json();
-        if (d.conversation) { cid = d.conversation.id; setConvId(cid); window.dispatchEvent(new CustomEvent("elshalflow_refresh_convs")); window.history.pushState({}, "", `/chat?c=${cid}`); }
-      } catch {}
-    }
+    if (!cid) { try { const r = await fetch("/api/conversations", { method: "POST", headers: { "Content-Type": "application/json", "x-anon-user-id": anonId }, body: JSON.stringify({ title: "Nouveau chat", model }) }); const d = await r.json(); if (d.conversation) { cid = d.conversation.id; setConvId(cid); window.dispatchEvent(new CustomEvent("elshalflow_refresh_convs")); window.history.pushState({}, "", `/chat?c=${cid}`); } } catch {} }
 
     let userContent: any = input.trim() || "[Image]";
     if (images.length > 0) {
@@ -133,12 +97,7 @@ export function ChatInterface({ convId: initialConvId }: { convId?: string }) {
     setInput(""); setImages([]); setLoading(true);
 
     const ams = msgs.map((m: any) => {
-      if (m.images?.length) {
-        const parts: any[] = [];
-        if (typeof m.content === "string" && m.content !== "[Image]") parts.push({ type: "text", text: m.content });
-        m.images.forEach((url: string) => { parts.push({ type: "image_url", image_url: { url } }); });
-        return { role: m.role, content: parts.length === 1 && parts[0].type === "text" ? parts[0].text : parts };
-      }
+      if (m.images?.length) { const parts: any[] = []; if (typeof m.content === "string" && m.content !== "[Image]") parts.push({ type: "text", text: m.content }); m.images.forEach((url: string) => { parts.push({ type: "image_url", image_url: { url } }); }); return { role: m.role, content: parts.length === 1 && parts[0].type === "text" ? parts[0].text : parts }; }
       return { role: m.role, content: m.content };
     });
     ams.push({ role: "user", content: userContent });
@@ -146,6 +105,7 @@ export function ChatInterface({ convId: initialConvId }: { convId?: string }) {
     const aid = "a" + Date.now();
     setMsgs((p: any) => [...p, { id: aid, role: "assistant", content: "", model }]);
     ar.current = new AbortController();
+    sc.current = 0;
 
     try {
       const res = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json", "x-anon-user-id": anonId }, body: JSON.stringify({ messages: ams, model, conversationId: cid }), signal: ar.current!.signal });
@@ -160,19 +120,37 @@ export function ChatInterface({ convId: initialConvId }: { convId?: string }) {
         const { done, value } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-        for (const line of lines) {
-          const t = line.trim();
-          if (!t || !t.startsWith("data: ")) continue;
+
+        // Process all complete SSE events in buffer
+        while (true) {
+          const idx = buffer.indexOf("\n\n");
+          if (idx === -1) break;
+          const block = buffer.substring(0, idx);
+          buffer = buffer.substring(idx + 2);
+
+          // Find data: lines in block
+          const dIdx = block.lastIndexOf("data: ");
+          if (dIdx === -1) continue;
+          const json = block.substring(dIdx + 6);
+
           try {
-            const parsed = JSON.parse(t.slice(6));
-            if (parsed.delta) { streamedContent += parsed.delta; if (parsed.model) streamedModel = parsed.model; setMsgs((p: any) => p.map((m: any) => m.id === aid ? { ...m, content: streamedContent, model: streamedModel } : m)); }
+            const parsed = JSON.parse(json);
+            if (parsed.delta) {
+              streamedContent += parsed.delta;
+              if (parsed.model) streamedModel = parsed.model;
+              sc.current++;
+              // Update UI every 3 deltas for smooth rendering
+              if (sc.current % 2 === 0) {
+                setMsgs((p: any) => p.map((m: any) => m.id === aid ? { ...m, content: streamedContent, model: streamedModel } : m));
+              }
+            }
             if (parsed.done && parsed.full) streamedContent = parsed.full;
             if (parsed.error) toast.error(parsed.error);
           } catch {}
         }
       }
+
+      // Final update
       setMsgs((p: any) => p.map((m: any) => m.id === aid ? { ...m, content: streamedContent || "(vide)", model: streamedModel } : m));
       window.dispatchEvent(new CustomEvent("elshalflow_refresh_convs"));
     } catch (err: any) {
@@ -192,12 +170,7 @@ export function ChatInterface({ convId: initialConvId }: { convId?: string }) {
   const cm = MODELS.find((m: any) => m.id === model) || MODELS[0];
   const frees = MODELS.filter((m: any) => m.f);
   const paids = MODELS.filter((m: any) => !m.f);
-  const fm = MODELS.filter((m: any) => {
-    if (mt === "free" && !m.f) return false;
-    if (mt === "paid" && m.f) return false;
-    if (s && !m.name.toLowerCase().includes(s.toLowerCase()) && !m.p.toLowerCase().includes(s.toLowerCase())) return false;
-    return true;
-  });
+  const fm = MODELS.filter((m: any) => { if (mt === "free" && !m.f) return false; if (mt === "paid" && m.f) return false; if (s && !m.name.toLowerCase().includes(s.toLowerCase()) && !m.p.toLowerCase().includes(s.toLowerCase())) return false; return true; });
 
   return (
     <div className="flex flex-col h-full bg-background">
@@ -208,26 +181,11 @@ export function ChatInterface({ convId: initialConvId }: { convId?: string }) {
             <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6"><Brain className="w-8 h-8 text-primary/40" /></div>
             <h1 className="text-2xl font-bold mb-2">ElshalflowAI</h1>
             <p className="text-muted-foreground text-sm max-w-xs mb-6">Assistant IA avec tous les modeles OpenRouter. Gratuit et prive.</p>
-            {!hasKey ? (
-              <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/5 max-w-xs">
-                <p className="text-amber-400 text-sm font-medium mb-1">Ajoutez votre cle API</p>
-                <p className="text-muted-foreground text-xs">Menu lateral → Cles API → collez votre cle</p>
-              </div>
-            ) : (<p className="text-green-400 text-xs">Cle detectee — Pret !</p>)}
+            {!hasKey ? (<div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/5 max-w-xs"><p className="text-amber-400 text-sm font-medium mb-1">Ajoutez votre cle API</p><p className="text-muted-foreground text-xs">Menu lateral → Cles API → collez votre cle</p></div>) : (<p className="text-green-400 text-xs">Cle detectee — Pret !</p>)}
           </div>
         ) : (
           <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
-            {msgs.map((msg: any) => (
-              <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[85%] break-words ${msg.role === "user" ? "flex flex-col items-end" : ""}`}>
-                  {msg.role === "assistant" && msg.model && <span className="text-[10px] text-muted-foreground mb-1 ml-1 font-medium">{MODELS.find((m: any) => m.id === msg.model)?.name || msg.model}</span>}
-                  {msg.images?.length > 0 && <div className="flex gap-1 mb-1 flex-wrap justify-end">{msg.images.map((img: string, i: number) => <img key={i} src={img} alt="" className="max-w-[120px] max-h-[120px] rounded-lg object-cover" />)}</div>}
-                  <div className={`px-4 py-3 text-[14px] leading-relaxed rounded-2xl ${msg.role === "user" ? "bg-primary/15 text-foreground rounded-br-md" : "text-foreground"}`}>
-                    {msg.content ? render(msg.content) : <span className="flex gap-1.5 py-1"><span className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" /><span className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: "0.15s" }} /><span className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: "0.3s" }} /></span>}
-                  </div>
-                </div>
-              </div>
-            ))}
+            {msgs.map((msg: any) => (<div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}><div className={`max-w-[85%] break-words ${msg.role === "user" ? "flex flex-col items-end" : ""}`}>{msg.role === "assistant" && msg.model && <span className="text-[10px] text-muted-foreground mb-1 ml-1 font-medium">{MODELS.find((m: any) => m.id === msg.model)?.name || msg.model}</span>}{msg.images?.length > 0 && <div className="flex gap-1 mb-1 flex-wrap justify-end">{msg.images.map((img: string, i: number) => <img key={i} src={img} alt="" className="max-w-[120px] max-h-[120px] rounded-lg object-cover" />)}</div>}<div className={`px-4 py-3 text-[14px] leading-relaxed rounded-2xl ${msg.role === "user" ? "bg-primary/15 text-foreground rounded-br-md" : "text-foreground"}`}>{msg.content ? render(msg.content) : <span className="flex gap-1.5 py-1"><span className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" /><span className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: "0.15s" }} /><span className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: "0.3s" }} /></span>}</div></div></div>))}
           </div>
         )}
       </div>
@@ -247,26 +205,7 @@ export function ChatInterface({ convId: initialConvId }: { convId?: string }) {
             {frees.slice(0, 6).map((m: any) => (<button key={m.id} type="button" onClick={() => sel(m.id)} className={`text-[11px] px-2.5 py-1.5 rounded-full border whitespace-nowrap shrink-0 ${m.id === model ? "border-primary/30 bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/20"}`}>{m.name}</button>))}
             <button type="button" onClick={() => { setShowM(true); setMt("paid"); }} className="text-[11px] px-2.5 py-1.5 rounded-full border border-border text-muted-foreground whitespace-nowrap shrink-0">+{paids.length} payants</button>
           </div>
-          {showM && (
-            <div className="absolute bottom-full mb-2 left-0 right-0 bg-card border border-border rounded-xl shadow-2xl overflow-hidden z-50" style={{ maxHeight: "60vh" }}>
-              <div className="p-3 border-b border-border space-y-2">
-                <input value={s} onChange={e => setS(e.target.value)} placeholder="Rechercher..." className="w-full bg-secondary/50 rounded-lg px-3 py-2 text-xs outline-none" autoFocus />
-                <div className="flex gap-1">
-                  <button type="button" onClick={() => setMt("all")} className={`text-[11px] px-2.5 py-1 rounded-md ${mt === "all" ? "bg-primary/20 text-primary" : "text-muted-foreground"}`}>Tous ({MODELS.length})</button>
-                  <button type="button" onClick={() => setMt("free")} className={`text-[11px] px-2.5 py-1 rounded-md ${mt === "free" ? "bg-green-500/20 text-green-400" : "text-muted-foreground"}`}>Gratuits ({frees.length})</button>
-                  <button type="button" onClick={() => setMt("paid")} className={`text-[11px] px-2.5 py-1 rounded-md ${mt === "paid" ? "bg-amber-500/20 text-amber-400" : "text-muted-foreground"}`}>Payants ({paids.length})</button>
-                </div>
-              </div>
-              <div className="overflow-y-auto" style={{ maxHeight: "50vh" }}>
-                {fm.slice(0, 30).map((m: any) => (
-                  <button key={m.id} type="button" onClick={() => sel(m.id)} className={`w-full text-left px-3 py-2.5 hover:bg-secondary/50 flex items-center justify-between gap-2 border-b border-border/20 ${m.id === model ? "bg-primary/5 border-l-2 border-l-primary" : ""}`}>
-                    <div className="min-w-0"><div className="text-xs font-medium flex items-center gap-1.5">{m.name}{m.f ? <span className="text-[10px] bg-green-500/15 text-green-400 px-1 py-0 rounded">Gratuit</span> : <span className="text-[10px] bg-amber-500/15 text-amber-400 px-1 py-0 rounded">Payant</span>}</div><div className="text-[10px] text-muted-foreground truncate">{m.p} · {m.d}</div></div>
-                    {m.id === model && <div className="w-2 h-2 rounded-full bg-primary shrink-0" />}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          {showM && (<div className="absolute bottom-full mb-2 left-0 right-0 bg-card border border-border rounded-xl shadow-2xl overflow-hidden z-50" style={{ maxHeight: "60vh" }}><div className="p-3 border-b border-border space-y-2"><input value={s} onChange={e => setS(e.target.value)} placeholder="Rechercher..." className="w-full bg-secondary/50 rounded-lg px-3 py-2 text-xs outline-none" autoFocus /><div className="flex gap-1"><button type="button" onClick={() => setMt("all")} className={`text-[11px] px-2.5 py-1 rounded-md ${mt === "all" ? "bg-primary/20 text-primary" : "text-muted-foreground"}`}>Tous ({MODELS.length})</button><button type="button" onClick={() => setMt("free")} className={`text-[11px] px-2.5 py-1 rounded-md ${mt === "free" ? "bg-green-500/20 text-green-400" : "text-muted-foreground"}`}>Gratuits ({frees.length})</button><button type="button" onClick={() => setMt("paid")} className={`text-[11px] px-2.5 py-1 rounded-md ${mt === "paid" ? "bg-amber-500/20 text-amber-400" : "text-muted-foreground"}`}>Payants ({paids.length})</button></div></div><div className="overflow-y-auto" style={{ maxHeight: "50vh" }}>{fm.slice(0, 30).map((m: any) => (<button key={m.id} type="button" onClick={() => sel(m.id)} className={`w-full text-left px-3 py-2.5 hover:bg-secondary/50 flex items-center justify-between gap-2 border-b border-border/20 ${m.id === model ? "bg-primary/5 border-l-2 border-l-primary" : ""}`}><div className="min-w-0"><div className="text-xs font-medium flex items-center gap-1.5">{m.name}{m.f ? <span className="text-[10px] bg-green-500/15 text-green-400 px-1 py-0 rounded">Gratuit</span> : <span className="text-[10px] bg-amber-500/15 text-amber-400 px-1 py-0 rounded">Payant</span>}</div><div className="text-[10px] text-muted-foreground truncate">{m.p} · {m.d}</div></div>{m.id === model && <div className="w-2 h-2 rounded-full bg-primary shrink-0" />}</button>))}</div></div>)}
           <p className="text-[10px] text-muted-foreground text-center mt-1.5">{hasKey ? "Cle OK · " : "Ajoutez cle dans Cles API · "}{frees.length} gratuits · {paids.length} payants</p>
         </div>
       </div>
