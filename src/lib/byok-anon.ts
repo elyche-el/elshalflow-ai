@@ -1,1 +1,75 @@
-import { getServiceClient } from "@/lib/supabase/anon-client";const SK=process.env.BYOK_ENCRYPTION_KEY||"elshalflow-dev-key-2026";function enc(k:string):string{if(!k)return"";const e=new TextEncoder();const d=e.encode(k);const s=e.encode(SK);const r=new Uint8Array(d.length);for(let i=0;i<d.length;i++)r[i]=d[i]^s[i%s.length];return Buffer.from(r).toString("base64")}function dec(e:string):string{if(!e)return"";const b=Buffer.from(e,"base64");const s=new TextEncoder().encode(SK);const r=new Uint8Array(b.length);for(let i=0;i<b.length;i++)r[i]=b[i]^s[i%s.length];return new TextDecoder().decode(r)}export async function saveApiKey(uid:string,pv:string,lb:string,rk:string,df:boolean){const sb=getServiceClient();if(df){await sb.from("anon_api_keys").update({is_default:false}).eq("anon_user_id",uid).eq("provider",pv)}const ed=enc(rk);const{data,error}=await sb.from("anon_api_keys").upsert({anon_user_id:uid,provider:pv,label:lb,encrypted_key:ed,is_default:df,updated_at:new Date().toISOString()},{onConflict:"anon_user_id,provider,label"}).select().single();if(error)throw new Error(error.message);return data}export async function getApiKeys(uid:string){const sb=getServiceClient();const{data}=await sb.from("anon_api_keys").select("*").eq("anon_user_id",uid).order("created_at",{ascending:false});return(data||[]).map((r:any)=>({...r,decrypted_key:dec(r.encrypted_key)}))}export async function deleteApiKey(uid:string,kid:string){const sb=getServiceClient();await sb.from("anon_api_keys").delete().eq("id",kid).eq("anon_user_id",uid)}export async function getDefaultKey(uid:string):Promise<string>{const sb=getServiceClient();const{data}=await sb.from("anon_api_keys").select("encrypted_key").eq("anon_user_id",uid).eq("is_default",true).maybeSingle();if(!data?.encrypted_key){const{data:a}=await sb.from("anon_api_keys").select("encrypted_key").eq("anon_user_id",uid).limit(1).maybeSingle();return a?.encrypted_key?dec(a.encrypted_key):""}return dec(data.encrypted_key)}export async function ensureAnonUser(uid:string){const sb=getServiceClient();const{data}=await sb.from("anon_users").select("id").eq("id",uid).maybeSingle();if(!data){await sb.from("anon_users").insert({id:uid,last_seen_at:new Date().toISOString()})}else{await sb.from("anon_users").update({last_seen_at:new Date().toISOString()}).eq("id",uid)}}
+import { getServiceClient } from "@/lib/supabase/anon-client";
+
+const SK = process.env.BYOK_ENCRYPTION_KEY || "elshalflow-dev-key-2026";
+
+function enc(k: string): string {
+  if (!k) return "";
+  const e = new TextEncoder();
+  const d = e.encode(k);
+  const s = e.encode(SK);
+  const r = new Uint8Array(d.length);
+  for (let i = 0; i < d.length; i++) r[i] = d[i] ^ s[i % s.length];
+  return Buffer.from(r).toString("base64");
+}
+
+function dec(e: string): string {
+  if (!e) return "";
+  const b = Buffer.from(e, "base64");
+  const s = new TextEncoder().encode(SK);
+  const r = new Uint8Array(b.length);
+  for (let i = 0; i < b.length; i++) r[i] = b[i] ^ s[i % s.length];
+  return new TextDecoder().decode(r);
+}
+
+export const PROVIDERS = {
+  openrouter: { id: "openrouter", name: "OpenRouter", baseUrl: "https://openrouter.ai/api/v1/chat/completions", envKey: "OPENROUTER_API_KEY" },
+  agentrouter: { id: "agentrouter", name: "AgentRouter", baseUrl: "https://agentrouter.org/v1/chat/completions", envKey: "AGENTROUTER_API_KEY" },
+} as const;
+
+export type ProviderId = keyof typeof PROVIDERS;
+
+export async function saveApiKey(uid: string, pv: string, lb: string, rk: string, df: boolean) {
+  const sb = getServiceClient();
+  if (df) { await sb.from("anon_api_keys").update({ is_default: false }).eq("anon_user_id", uid).eq("provider", pv); }
+  const ed = enc(rk);
+  const { data, error } = await sb.from("anon_api_keys").upsert({ anon_user_id: uid, provider: pv, label: lb, encrypted_key: ed, is_default: df, updated_at: new Date().toISOString() }, { onConflict: "anon_user_id,provider,label" }).select().single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function getApiKeys(uid: string) {
+  const sb = getServiceClient();
+  const { data } = await sb.from("anon_api_keys").select("*").eq("anon_user_id", uid).order("created_at", { ascending: false });
+  return (data || []).map((r: any) => ({ ...r, decrypted_key: dec(r.encrypted_key) }));
+}
+
+export async function deleteApiKey(uid: string, kid: string) {
+  const sb = getServiceClient();
+  await sb.from("anon_api_keys").delete().eq("id", kid).eq("anon_user_id", uid);
+}
+
+export async function getDefaultKey(uid: string): Promise<string> {
+  const sb = getServiceClient();
+  const { data } = await sb.from("anon_api_keys").select("encrypted_key").eq("anon_user_id", uid).eq("is_default", true).maybeSingle();
+  if (!data?.encrypted_key) { const { data: a } = await sb.from("anon_api_keys").select("encrypted_key").eq("anon_user_id", uid).limit(1).maybeSingle(); return a?.encrypted_key ? dec(a.encrypted_key) : ""; }
+  return dec(data.encrypted_key);
+}
+
+export async function getDefaultKeyForProvider(uid: string, provider: ProviderId): Promise<string> {
+  const sb = getServiceClient();
+  const { data } = await sb.from("anon_api_keys").select("encrypted_key").eq("anon_user_id", uid).eq("provider", provider).eq("is_default", true).maybeSingle();
+  if (data?.encrypted_key) return dec(data.encrypted_key);
+  const { data: a } = await sb.from("anon_api_keys").select("encrypted_key").eq("anon_user_id", uid).eq("provider", provider).limit(1).maybeSingle();
+  if (a?.encrypted_key) return dec(a.encrypted_key);
+  const providerConfig = PROVIDERS[provider];
+  if (providerConfig) { const envKey = process.env[providerConfig.envKey] || ""; if (envKey) return envKey; }
+  if (provider === "openrouter") return process.env.OPENROUTER_API_KEY || "";
+  return "";
+}
+
+export async function ensureAnonUser(uid: string) {
+  const sb = getServiceClient();
+  const { data } = await sb.from("anon_users").select("id").eq("id", uid).maybeSingle();
+  if (!data) { await sb.from("anon_users").insert({ id: uid, last_seen_at: new Date().toISOString() }); }
+  else { await sb.from("anon_users").update({ last_seen_at: new Date().toISOString() }).eq("id", uid); }
+}
