@@ -1,80 +1,22 @@
 import { NextRequest } from "next/server";
-import { getDefaultKeyForProvider, ensureAnonUser, PROVIDERS, ProviderId } from "@/lib/byok-anon";
+import { getDefaultKey, getApiKeys, ensureAnonUser } from "@/lib/byok-anon";
 import { getServiceClient } from "@/lib/supabase/anon-client";
-
-function sse(data: string) { return new TextEncoder().encode(`data: ${data}\n\n`); }
-function jsonResponse(d: any, status: number) { return new Response(JSON.stringify(d), { status, headers: { "Content-Type": "application/json" } }); }
-
-const VISION_MODEL_KEYWORDS = ["gemma","gpt-4o","claude","omni","vl","vision","qwen-vl","pixtral","llava","gemini","multimodal"];
-function isVisionModel(modelId: string): boolean { const lower = modelId.toLowerCase(); return VISION_MODEL_KEYWORDS.some(kw => lower.includes(kw)); }
-
-async function streamToSSE(upstream: Response, controller: ReadableStreamDefaultController, modelId: string, meta?: { conversationId?: string; anonId?: string; messages?: any[] }) {
-  const reader = upstream.body?.getReader();
-  if (!reader) { controller.enqueue(sse(JSON.stringify({ error: "Stream non disponible" }))); controller.close(); return; }
-  controller.enqueue(sse(":connected\n"));
-  const decoder = new TextDecoder();
-  let fullContent = ""; let buffer = "";
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n"); buffer = lines.pop() || "";
-      for (const line of lines) {
-        const t = line.trim(); if (!t || !t.startsWith("data: ")) continue;
-        const data = t.slice(6);
-        if (data === "[DONE]") {
-          if (meta?.conversationId && meta?.anonId && fullContent) {
-            try { const sb = getServiceClient(); const userText = typeof meta.messages?.[meta.messages.length - 1]?.content === "string" ? meta.messages[meta.messages.length - 1].content : "[Message]"; await sb.from("anon_messages").insert([{ conversation_id: meta.conversationId, role: "user", content: userText, model: modelId },{ conversation_id: meta.conversationId, role: "assistant", content: fullContent, model: modelId }]); } catch {}
-          }
-          controller.enqueue(sse(JSON.stringify({ done: true }))); continue;
-        }
-        try { const parsed = JSON.parse(data); const delta = parsed.choices?.[0]?.delta?.content; if (delta) { fullContent += delta; controller.enqueue(sse(JSON.stringify({ delta, model: modelId }))); } } catch {}
-      }
-    }
-    if (buffer.trim().startsWith("data: ")) { const d = buffer.trim().slice(6); if (d !== "[DONE]") { try { const parsed = JSON.parse(d); const delta = parsed.choices?.[0]?.delta?.content; if (delta) { fullContent += delta; controller.enqueue(sse(JSON.stringify({ delta, model: modelId }))); } } catch {} } }
-  } catch (err: any) { controller.enqueue(sse(JSON.stringify({ error: err.message }))); }
-  controller.enqueue(sse(JSON.stringify({ done: true, full: fullContent, model: modelId })));
-  controller.close();
-}
-
-export async function POST(req: NextRequest) {
-  try {
-    const { messages, model, provider, apiKey: dk, conversationId } = await req.json();
-    const anonId = req.headers.get("x-anon-user-id") || "";
-    const resolvedProvider: ProviderId = provider && PROVIDERS[provider as ProviderId] ? (provider as ProviderId) : "openrouter";
-    const providerConfig = PROVIDERS[resolvedProvider];
-    const modelId = model || "nvidia/nemotron-3-super-120b-a12b:free";
-    let key = dk || "";
-    if (!key && anonId) { await ensureAnonUser(anonId); key = await getDefaultKeyForProvider(anonId, resolvedProvider); }
-    if (!key) { if (resolvedProvider === "openrouter") key = process.env.OPENROUTER_API_KEY || ""; else if (resolvedProvider === "agentrouter") key = process.env.AGENTROUTER_API_KEY || ""; }
-    if (!key) return jsonResponse({ response: `Aucune cle API ${providerConfig.name}.` }, 200);
-
-    const supportsVision = isVisionModel(modelId);
-    const normalizedMessages = messages.map((m: any) => {
-      if (!Array.isArray(m.content)) return m;
-      if (supportsVision) return { ...m, content: m.content };
-      const text = m.content.filter((c: any) => c.type === "text").map((c: any) => c.text).join("\n");
-      return { ...m, content: text || "[Image non analysable]" };
-    });
-
-    const payload = { model: modelId, messages: normalizedMessages, max_tokens: 2048, stream: true };
-
-    const fetchHeaders: Record<string, string> = { "Content-Type": "application/json", Authorization: `Bearer ${key}` };
-    if (resolvedProvider === "openrouter") { fetchHeaders["HTTP-Referer"] = "https://elshalflow-ai.vercel.app"; fetchHeaders["X-Title"] = "ElshalflowAI"; }
-    if (resolvedProvider === "agentrouter") { fetchHeaders["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ElshalflowAI/2.0"; }
-
-    const upstream = await fetch(providerConfig.baseUrl, { method: "POST", headers: fetchHeaders, body: JSON.stringify(payload) });
-
-    if (!upstream.ok) {
-      const text = await upstream.text();
-      let message = `${providerConfig.name} erreur ${upstream.status}`;
-      if (resolvedProvider === "agentrouter" && text.includes("<!doctype html")) message = `${providerConfig.name}: WAF/CAPTCHA detecte. L'API AgentRouter necessite un navigateur.`;
-      else { try { const err = JSON.parse(text); message = err.error?.message || err.msg || err.message || message; } catch {} }
-      return jsonResponse({ response: message }, 500);
-    }
-
-    const stream = new ReadableStream({ async start(controller) { await streamToSSE(upstream, controller, modelId, { conversationId, anonId, messages }); } });
-    return new Response(stream, { headers: { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive", "X-Accel-Buffering": "no", "Transfer-Encoding": "chunked" } });
-  } catch (e: any) { return jsonResponse({ response: `Erreur: ${e.message || "?"}` }, 500); }
-}
+function sse(d:string){return new TextEncoder().encode(`data: ${d}\n\n`)}
+function j(d:any,s:number){return new Response(JSON.stringify(d),{status:s,headers:{"Content-Type":"application/json"}})}
+const P={openrouter:{baseUrl:"https://openrouter.ai/api/v1/chat/completions",envKey:process.env.OPENROUTER_API_KEY,extraHeaders:()=>({"HTTP-Referer":"https://elshalflow-ai.vercel.app","X-Title":"ElshalflowAI"})},agentrouter:{baseUrl:"https://agentrouter.org/v1/chat/completions",envKey:process.env.AGENTROUTER_API_KEY,extraHeaders:()=>({"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ElshalflowAI/2.0","Origin":"https://elshalflow-ai.vercel.app"})}};
+const VK=["gemma","gpt-4o","claude","omni","vl","vision","qwen-vl","pixtral","llava","gemini","multimodal"];
+function isV(id:string){return VK.some(k=>id.toLowerCase().includes(k))}
+async function rk(p:string,u:string,d:string):Promise<string>{if(d)return d;if(u){await ensureAnonUser(u);const ks=await getApiKeys(u);const m=ks.find((k:any)=>k.provider===p);if(m?.decrypted_key)return m.decrypted_key;const def=await getDefaultKey(u);if(def)return def}const c=P[p as keyof typeof P];return c?.envKey||""}
+export async function POST(req:NextRequest){try{const{messages,model,apiKey:dk,conversationId,provider="openrouter"}=await req.json();const anonId=req.headers.get("x-anon-user-id")||"";const c=P[provider as keyof typeof P];if(!c)return j({response:`Provider inconnu: ${provider}`},400);const key=await rk(provider,anonId,dk);if(!key)return j({response:`Aucune cle API pour ${provider}`},200);const mid=model||"nvidia/nemotron-3-super-120b-a12b:free";const vis=isV(mid);const nm=messages.map((m:any)=>{if(!Array.isArray(m.content))return m;if(vis)return{...m,content:m.content};const t=m.content.filter((c:any)=>c.type==="text").map((c:any)=>c.text).join("\n");return{...m,content:t||"[Image non analysable — utilisez un modele Vision]"}});
+const payload={model:mid,messages:nm,max_tokens:2048,stream:true};
+const h:Record<string,string>={...{"Content-Type":"application/json",Authorization:`Bearer ${key}`},...c.extraHeaders()};
+const up=await fetch(c.baseUrl,{method:"POST",headers:h,body:JSON.stringify(payload)});
+if(!up.ok){const t=await up.text();let msg=`Erreur ${up.status}`;try{msg=JSON.parse(t).error?.message||msg}catch{}if(t.includes("aliyun_waf")||t.includes("captcha"))msg="AgentRouter WAF bloque la requete. Essayez via un navigateur.";return j({response:msg},500)}
+const stream=new ReadableStream({async start(ctrl){const r=up.body?.getReader();if(!r){ctrl.enqueue(sse(JSON.stringify({error:"Stream non disponible"})));ctrl.close();return}
+ctrl.enqueue(sse(":connected\n"));const d=new TextDecoder();let fc="";let b="";
+try{while(true){const{done,value}=await r.read();if(done)break;b+=d.decode(value,{stream:true});const ls=b.split("\n");b=ls.pop()||"";for(const l of ls){const t=l.trim();if(!t||!t.startsWith("data: "))continue;const dd=t.slice(6);if(dd==="[DONE]"){if(conversationId&&anonId&&fc){try{const sb=getServiceClient();const ut=typeof messages?.[messages.length-1]?.content==="string"?messages[messages.length-1].content:"[Message]";await sb.from("anon_messages").insert([{conversation_id:conversationId,role:"user",content:ut,model:mid,provider},{conversation_id:conversationId,role:"assistant",content:fc,model:mid,provider}])}catch{}}ctrl.enqueue(sse(JSON.stringify({done:true})));continue}
+try{const p=JSON.parse(dd);const delta=p.choices?.[0]?.delta?.content;if(delta){fc+=delta;ctrl.enqueue(sse(JSON.stringify({delta,model:mid})))}}catch{}}}
+if(b.trim().startsWith("data: ")){const rem=b.trim().slice(6);if(rem!=="[DONE]"){try{const p=JSON.parse(rem);const delta=p.choices?.[0]?.delta?.content;if(delta){fc+=delta;ctrl.enqueue(sse(JSON.stringify({delta,model:mid})))}}catch{}}}
+}catch(err:any){ctrl.enqueue(sse(JSON.stringify({error:err.message})))}
+ctrl.enqueue(sse(JSON.stringify({done:true,full:fc,model:mid})));ctrl.close()}});
+return new Response(stream,{headers:{"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache, no-transform",Connection:"keep-alive","X-Accel-Buffering":"no","Transfer-Encoding":"chunked"}})}catch(e:any){return j({response:`Erreur: ${e.message||"?"}`},500)}}
