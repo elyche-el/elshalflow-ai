@@ -6,13 +6,11 @@ export async function GET(req: NextRequest) {
   if (!anonId) return NextResponse.json({ error: "Missing anon user ID" }, { status: 400 });
   await ensureAnonUser(anonId);
   const keys = await getApiKeys(anonId);
-  if (!keys || keys.length === 0) {
-    const v: any[] = [];
-    if (process.env.OPENROUTER_API_KEY) v.push({ id: "server-or", provider: "openrouter", label: "Server Key (OR)", is_default: true, virtual: true });
-    if (process.env.AGENTROUTER_API_KEY) v.push({ id: "server-ar", provider: "agentrouter", label: "Server Key (AR)", is_default: false, virtual: true });
-    if (v.length > 0) return NextResponse.json({ keys: v });
+  // If no user keys but server has OPENROUTER_API_KEY, return a virtual key so frontend works
+  if ((!keys || keys.length === 0) && process.env.OPENROUTER_API_KEY) {
+    return NextResponse.json({ keys: [{ id: "server", provider: "openrouter", label: "Server Key", is_default: true, virtual: true }] });
   }
-  return NextResponse.json({ keys: keys || [] });
+  return NextResponse.json({ keys });
 }
 
 export async function POST(req: NextRequest) {
@@ -21,9 +19,8 @@ export async function POST(req: NextRequest) {
   await ensureAnonUser(anonId);
   const { provider, label, key, is_default } = await req.json();
   if (!provider || !key) return NextResponse.json({ error: "provider and key required" }, { status: 400 });
-  const pv = (provider === "agentrouter") ? "agentrouter" : "openrouter";
-  const data = await saveApiKey(anonId, pv, label || (pv === "agentrouter" ? "AgentRouter" : "OpenRouter"), key, !!is_default);
-  return NextResponse.json({ ok: true, id: data.id, provider: pv });
+  const data = await saveApiKey(anonId, provider, label || "OpenRouter", key, !!is_default);
+  return NextResponse.json({ ok: true, id: data.id });
 }
 
 export async function DELETE(req: NextRequest) {
