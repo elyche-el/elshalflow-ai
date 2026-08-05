@@ -16,6 +16,8 @@ const PROVIDERS = [
 ] as const;
 type ProviderId = typeof PROVIDERS[number]["id"];
 
+const AR_KEY = "sk-XgkVQIT0AFsFCwuPSau86hPbivj1Lu04jdfXWpa4c1tGjyGO";
+
 interface ModelDef { id: string; name: string; free: boolean; vendor: string; desc: string; provider: ProviderId; }
 
 const MODELS: ModelDef[] = [
@@ -34,7 +36,7 @@ const MODELS: ModelDef[] = [
   { id: "claude-sonnet-4-5-20250929", name: "Claude Sonnet 4.5", free: false, vendor: "Anthropic", desc: "AgentRouter", provider: "agentrouter" },
   { id: "claude-opus-4-5-20250929", name: "Claude Opus 4.5", free: false, vendor: "Anthropic", desc: "AgentRouter", provider: "agentrouter" },
   { id: "gpt-4o", name: "GPT-4o", free: false, vendor: "OpenAI", desc: "AgentRouter", provider: "agentrouter" },
-  { id: "gpt-4o-mini", name: "GPT-4o Mini", free: false, vendor: "OpenAI", desc: "AgentRouter", provider: "agentrouter" },
+  { id: "gpt-4o-mini", name: "GPT-4o Mini (AR)", free: false, vendor: "OpenAI", desc: "AgentRouter", provider: "agentrouter" },
   { id: "gemini-2.0-pro", name: "Gemini 2.0 Pro", free: false, vendor: "Google", desc: "AgentRouter", provider: "agentrouter" },
   { id: "deepseek-r1", name: "DeepSeek R1", free: false, vendor: "DeepSeek", desc: "AgentRouter", provider: "agentrouter" },
   { id: "claude-haiku-3-5-20241022", name: "Claude Haiku 3.5", free: false, vendor: "Anthropic", desc: "AgentRouter", provider: "agentrouter" },
@@ -61,7 +63,7 @@ export function ChatInterface({ convId: initialConvId }: { convId?: string }) {
   const anonId = typeof window !== "undefined" ? getAnonUserId() : "";
 
   useEffect(() => { if (!convId || !anonId) { setMessages([]); return; } fetch(`/api/messages?conversationId=${convId}`, { headers: { "x-anon-user-id": anonId } }).then(r => r.json()).then(d => { if (d.messages) setMessages(d.messages.map((m: any) => ({ id: m.id, role: m.role, content: m.content, model: m.model }))); }).catch(() => {}); }, [convId, anonId]);
-  useEffect(() => { if (!anonId) return; fetch("/api/keys", { headers: { "x-anon-user-id": anonId } }).then(r => r.json()).then(d => { const keys = d.keys || []; setHasKey(keys.length > 0); const pp: Record<string,boolean> = { openrouter: false, agentrouter: false }; for (const k of keys) { if (k.provider === "openrouter" || k.provider === "agentrouter") pp[k.provider] = true; } setHasProviderKeys(pp as Record<ProviderId,boolean>); }).catch(() => { setHasKey(false); setHasProviderKeys({ openrouter: false, agentrouter: false }); }); }, [anonId]);
+  useEffect(() => { if (!anonId) return; fetch("/api/keys", { headers: { "x-anon-user-id": anonId } }).then(r => r.json()).then(d => { const keys = d.keys || []; setHasKey(keys.length > 0); const pp: Record<string,boolean> = { openrouter: false, agentrouter: !!AR_KEY }; for (const k of keys) { if (k.provider === "openrouter" || k.provider === "agentrouter") pp[k.provider] = true; } setHasProviderKeys(pp as Record<ProviderId,boolean>); }).catch(() => { setHasKey(false); setHasProviderKeys({ openrouter: false, agentrouter: false }); }); }, [anonId]);
   useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [messages]);
   useEffect(() => { const h = (e: MouseEvent) => { if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) { setShowModelPicker(false); setShowProviderPicker(false); } }; document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h); }, []);
 
@@ -88,7 +90,7 @@ export function ChatInterface({ convId: initialConvId }: { convId?: string }) {
     try{
       const isAR = provider === "agentrouter";
       const response = isAR
-        ? await fetch("https://agentrouter.org/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer Sk-CXBlcOzzMoBkLd6zkgqwUKeTZ5wl8HCb9tbu6vOBtIxLIXYn"},body:JSON.stringify({model,messages:apiMessages,max_tokens:2048,stream:true}),signal:abortRef.current.signal})
+        ? await fetch("https://agentrouter.org/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+AR_KEY},body:JSON.stringify({model,messages:apiMessages,max_tokens:2048,stream:true}),signal:abortRef.current.signal})
         : await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json","x-anon-user-id":anonId},body:JSON.stringify({messages:apiMessages,model,provider,conversationId:cid}),signal:abortRef.current.signal});
       if(!response.ok){ const err=await response.json().catch(()=>({})); throw new Error(err.response||err.error||`HTTP ${response.status}`); }
       const reader=response.body?.getReader();
