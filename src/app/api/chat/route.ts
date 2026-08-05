@@ -38,13 +38,7 @@ export async function POST(req: NextRequest) {
       messages: messages.map((m: any) => {
         if (Array.isArray(m.content)) {
           if (isVision) return { ...m, content: m.content };
-          return {
-            ...m,
-            content: m.content
-              .filter((c: any) => c.type === "text")
-              .map((c: any) => c.text)
-              .join("\n")
-          };
+          return { ...m, content: m.content.filter((c: any) => c.type === "text").map((c: any) => c.text).join("\n") };
         }
         return m;
       }),
@@ -54,12 +48,7 @@ export async function POST(req: NextRequest) {
 
     const resp = await fetch(OPENROUTER, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${key}`,
-        "HTTP-Referer": "https://elshalflow-ai.vercel.app",
-        "X-Title": "ElshalflowAI",
-      },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}`, "HTTP-Referer": "https://elshalflow-ai.vercel.app", "X-Title": "ElshalflowAI" },
       body: JSON.stringify(body),
     });
 
@@ -73,85 +62,36 @@ export async function POST(req: NextRequest) {
     const stream = new ReadableStream({
       async start(controller) {
         const reader = resp.body?.getReader();
-        if (!reader) {
-          controller.enqueue(sse(JSON.stringify({ error: "No stream" })));
-          controller.close();
-          return;
-        }
-
+        if (!reader) { controller.enqueue(sse(JSON.stringify({ error: "No stream" }))); controller.close(); return; }
+        controller.enqueue(sse(":ok\n"));
         const decoder = new TextDecoder();
-        let fullContent = "";
-        let buffer = "";
-
+        let fullContent = ""; let buffer = "";
         try {
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-
             buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split("\n");
-            buffer = lines.pop() || "";
-
+            const lines = buffer.split("\n"); buffer = lines.pop() || "";
             for (const line of lines) {
-              const trimmed = line.trim();
-              if (!trimmed || !trimmed.startsWith("data: ")) continue;
-              const data = trimmed.slice(6);
-
+              const t = line.trim(); if (!t || !t.startsWith("data: ")) continue;
+              const data = t.slice(6);
               if (data === "[DONE]") {
                 if (conversationId && anonId && fullContent) {
-                  try {
-                    const sb = getServiceClient();
-                    await sb.from("anon_messages").insert([
-                      { conversation_id: conversationId, role: "user", content: typeof messages?.[messages.length - 1]?.content === "string" ? messages[messages.length - 1].content : "[Message]", model: modelId },
-                      { conversation_id: conversationId, role: "assistant", content: fullContent, model: modelId }
-                    ]);
-                  } catch {}
+                  try { const sb = getServiceClient(); await sb.from("anon_messages").insert([{ conversation_id: conversationId, role: "user", content: typeof messages?.[messages.length - 1]?.content === "string" ? messages[messages.length - 1].content : "[Message]", model: modelId },{ conversation_id: conversationId, role: "assistant", content: fullContent, model: modelId }]); } catch {}
                 }
-                controller.enqueue(sse(JSON.stringify({ done: true })));
-                continue;
+                controller.enqueue(sse(JSON.stringify({ done: true }))); continue;
               }
-
-              try {
-                const parsed = JSON.parse(data);
-                const delta = parsed.choices?.[0]?.delta?.content;
-                if (delta) {
-                  fullContent += delta;
-                  controller.enqueue(sse(JSON.stringify({ delta, model: modelId })));
-                }
-              } catch {}
+              try { const parsed = JSON.parse(data); const delta = parsed.choices?.[0]?.delta?.content; if (delta) { fullContent += delta; controller.enqueue(sse(JSON.stringify({ delta, model: modelId }))); } } catch {}
             }
           }
-
-          if (buffer.trim().startsWith("data: ")) {
-            const d = buffer.trim().slice(6);
-            if (d !== "[DONE]") {
-              try {
-                const parsed = JSON.parse(d);
-                const delta = parsed.choices?.[0]?.delta?.content;
-                if (delta) {
-                  fullContent += delta;
-                  controller.enqueue(sse(JSON.stringify({ delta, model: modelId })));
-                }
-              } catch {}
-            }
-          }
-        } catch (err: any) {
-          controller.enqueue(sse(JSON.stringify({ error: err.message })));
-        }
-
+          if (buffer.trim().startsWith("data: ")) { const d = buffer.trim().slice(6); if (d !== "[DONE]") { try { const parsed = JSON.parse(d); const delta = parsed.choices?.[0]?.delta?.content; if (delta) { fullContent += delta; controller.enqueue(sse(JSON.stringify({ delta, model: modelId }))); } } catch {} } }
+        } catch (err: any) { controller.enqueue(sse(JSON.stringify({ error: err.message }))); }
         controller.enqueue(sse(JSON.stringify({ done: true, full: fullContent, model: modelId })));
         controller.close();
       },
     });
 
-    return new Response(stream, {
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-        "X-Accel-Buffering": "no",
-      },
-    });
+    return new Response(stream, { headers: { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", "Connection": "keep-alive", "X-Accel-Buffering": "no" } });
   } catch (e: any) {
     return j({ response: "Erreur: " + (e.message || "?") }, 500);
   }
