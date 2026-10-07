@@ -14,7 +14,7 @@ const STABLE = new Set(["mistral-large-latest","deepseek/deepseek-chat-v3-0324",
 function resolveModel(mid: string): string { if (STABLE.has(mid)) return mid; if (mid.startsWith("mistral-")) { console.warn(`[ModelRouter] Unstable "${mid}" → mistral-large-latest`); return "mistral-large-latest"; } return mid; }
 const VK = ["gemma","gpt-4o","claude","omni","vl","vision","qwen-vl","pixtral","llava","gemini","multimodal","mistral-large"];
 function isV(id: string) { return VK.some(k => id.toLowerCase().includes(k)); }
-async function rk(pv: string, u: string, d: string): Promise<string> { if (d) return d; if (u) { await ensureAnonUser(u); const k = await getDefaultKey(u); if (k) return k; } if (pv === "openrouter") return process.env.OPENROUTER_API_KEY || ""; if (pv === "mistral") return process.env.MISTRAL_API_KEY || "eF8PjxVog3VLU3FBHk2WMp4ZnVO8eeTG"; return ""; }
+async function rk(pv: string, u: string, d: string): Promise<string> { if (d) return d; if (u) { await ensureAnonUser(u); const k = await getDefaultKey(u); if (k) return k; } if (pv === "openrouter") return process.env.OPENROUTER_API_KEY || ""; if (pv === "mistral") return process.env.MISTRAL_API_KEY || ""; return ""; }
 
 interface UT { name: string; source: "builtin"|"composio"|"mcp"; definition: any; execute: (p: Record<string, any>) => Promise<any>; simulate: (p: Record<string, any>) => string; }
 async function buildTools(userId: string): Promise<UT[]> {
